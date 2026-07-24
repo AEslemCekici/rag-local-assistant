@@ -33,12 +33,12 @@ imlec.execute("""
 baglanti.commit()
 
 print("5. Ornek dokumanlar embedding'e cevriliyor ve kaydediliyor...")
-dokumanlar = [
-    "Foundry Local, yapay zeka modellerini internetsiz calistiran bir Microsoft araci.",
-    "RAG, bir soruyu cevaplarken once ilgili bilgiyi bulup sonra modele veren bir yontemdir.",
-    "SQLite, tek bir dosyadan olusan, sunucu gerektirmeyen basit bir veritabanidir.",
-    "Istanbul, Turkiye'nin en kalabalik sehridir ve Bogaz'in iki yakasina yayilir."
-]
+print("   Dokuman dosyasi okunuyor...")
+with open("dokuman.txt", "r", encoding="utf-8") as f:
+    icerik = f.read()
+
+dokumanlar = [parca.strip() for parca in icerik.split("\n\n") if parca.strip()]
+print(f"   Dokuman {len(dokumanlar)} parcaya (chunk) bolundu.")
 
 # Onceki denemelerden kalan kayitlari temizleyelim, tekrar tekrar eklenmesin
 imlec.execute("DELETE FROM parcalar")
@@ -78,7 +78,7 @@ def en_benzer_dokumani_bul(soru):
     return en_iyi_metin, en_iyi_skor
 
 print("\n6. Soru soruluyor...")
-soru = "RAG nedir?"
+soru = "Malazgirt Savasi ne zaman oldu?"
 bulunan_metin, skor = en_benzer_dokumani_bul(soru)
 print(f"   Soru: {soru}")
 print(f"   En benzer dokuman (skor {skor:.4f}): {bulunan_metin}")
