@@ -6,6 +6,11 @@ from foundry_local_sdk import Configuration, FoundryLocalManager
 import streamlit as st
 import PyPDF2
 import docx
+import os
+from dotenv import load_dotenv
+
+# Gizli ayarlari yukle
+load_dotenv()
 
 # ==============================================================================
 # 1. MİNİMAL VE NATIVE ARAYÜZ
@@ -36,7 +41,8 @@ embed_client, chat_client = motoru_baslat()
 # ==============================================================================
 # 3. VERİTABANI VE AKILLI PARÇALAMA
 # ==============================================================================
-DB_YOLU = "kurumsal_belgeler.db"
+# Veritabani adini .env dosyasindan cek (Yoksa varsayilan olarak kurumsal_belgeler.db kullan)
+DB_YOLU = os.getenv("DB_NAME", "kurumsal_belgeler.db")
 
 def veritabani_hazirla():
     baglanti = sqlite3.connect(DB_YOLU)
