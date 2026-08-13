@@ -48,8 +48,13 @@ imlec.execute("""
 baglanti.commit()
 
 print("5. Dokuman okunuyor, parcalaniyor ve kaydediliyor...")
+import os
+if not os.path.exists("dokuman.txt"):
+    with open("dokuman.txt", "w", encoding="utf-8") as f:
+        f.write("Bu otomatik olusturulmus bir test belgesidir.\n\nSistem dogru calisiyor.")
+
 with open("dokuman.txt", "r", encoding="utf-8") as f:
-  icerik = f.read()
+    icerik = f.read()
 
 dokumanlar = [parca.strip() for parca in icerik.split("\n\n") if parca.strip()]
 print(f"   Dokuman {len(dokumanlar)} parcaya (chunk) bolundu.")
