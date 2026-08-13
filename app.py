@@ -2,6 +2,7 @@ import json
 import sqlite3
 import numpy as np
 import time
+import logging
 from foundry_local_sdk import Configuration, FoundryLocalManager
 import streamlit as st
 import PyPDF2
@@ -11,6 +12,17 @@ from dotenv import load_dotenv
 
 # Gizli ayarlari yukle
 load_dotenv()
+
+# ==============================================================================
+# LOGLAMA (KARA KUTU) AYARLARI
+# ==============================================================================
+logging.basicConfig(
+    filename="sistem.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    encoding="utf-8"
+)
+logging.info("Sistem baslatiliyor...")
 
 # ==============================================================================
 # 1. MİNİMAL VE NATIVE ARAYÜZ
@@ -34,6 +46,7 @@ def motoru_baslat():
     chat_model.download(); chat_model.load()
     chat_client = chat_model.get_chat_client()
 
+    logging.info("Yapay zeka modelleri (Embedding ve Chat) basariyla yuklendi.")
     return embed_client, chat_client
 
 embed_client, chat_client = motoru_baslat()
@@ -41,13 +54,13 @@ embed_client, chat_client = motoru_baslat()
 # ==============================================================================
 # 3. VERİTABANI VE AKILLI PARÇALAMA
 # ==============================================================================
-# Veritabani adini .env dosyasindan cek (Yoksa varsayilan olarak kurumsal_belgeler.db kullan)
 DB_YOLU = os.getenv("DB_NAME", "kurumsal_belgeler.db")
 
 def veritabani_hazirla():
     baglanti = sqlite3.connect(DB_YOLU)
     baglanti.execute("CREATE TABLE IF NOT EXISTS parcalar (id INTEGER PRIMARY KEY AUTOINCREMENT, dosya_adi TEXT, metin TEXT, embedding TEXT)")
     baglanti.commit(); baglanti.close()
+    logging.info(f"Veritabani hazir: {DB_YOLU}")
 
 veritabani_hazirla()
 
@@ -60,7 +73,10 @@ def dosya_icerigini_cikar(dosya):
             for sayfa in PyPDF2.PdfReader(dosya).pages: metin += sayfa.extract_text() + " "
         elif uzanti == "docx":
             metin = " ".join([para.text for para in docx.Document(dosya).paragraphs])
-    except Exception as e: st.sidebar.error(f"Okuma hatası: {e}")
+        logging.info(f"Dosya basariyla okundu: {dosya.name}")
+    except Exception as e: 
+        st.sidebar.error(f"Okuma hatası: {e}")
+        logging.error(f"Dosya okuma hatasi ({dosya.name}): {e}")
     return metin
 
 def akilli_parcalama(metin, max_kelime=150, kesisim=30):
@@ -85,6 +101,7 @@ def dokuman_isle_ve_kaydet(metin_icerigi, dosya_adi):
             imlec.execute("INSERT INTO parcalar (dosya_adi, metin, embedding) VALUES (?, ?, ?)", (dosya_adi, dokuman, json.dumps(vektor)))
             eklenen += 1
     baglanti.commit(); baglanti.close()
+    logging.info(f"Veritabanina islendi: {dosya_adi} | Eklenen chunk: {eklenen}")
     return eklenen
 
 # ==============================================================================
@@ -131,7 +148,6 @@ with st.sidebar:
             with st.expander("📑 Yüklü Kaynakları İncele"):
                 for d in dosyalar: st.markdown(f"- `{d}`")
                 
-            # YENİ EKLENEN: TEKİL DOSYA SİLME ÖZELLİĞİ
             st.markdown("---")
             st.markdown("**🗑️ Veri Silme**")
             silinecek_dosya = st.selectbox("Silinecek dosyayı seçin:", dosyalar, label_visibility="collapsed")
@@ -139,17 +155,18 @@ with st.sidebar:
                 baglanti = sqlite3.connect(DB_YOLU)
                 baglanti.execute("DELETE FROM parcalar WHERE dosya_adi = ?", (silinecek_dosya,))
                 baglanti.commit(); baglanti.close()
+                logging.info(f"Kullanici dosyayi sildi: {silinecek_dosya}")
                 st.success(f"{silinecek_dosya} başarıyla silindi!")
                 time.sleep(1)
                 st.rerun()
         else:
             st.info("Henüz belge yüklenmedi.")
 
-    # YENİ EKLENEN: GERÇEK VERİTABANI SIFIRLAMA
     if st.button("💥 Tüm Veritabanını Sıfırla", type="primary", use_container_width=True):
         baglanti = sqlite3.connect(DB_YOLU)
         baglanti.execute("DELETE FROM parcalar")
         baglanti.commit(); baglanti.close()
+        logging.warning("DIKKAT: Veritabani tamamen sifirlandi!")
         st.session_state.mesajlar = [{"role": "assistant", "content": "Veritabanı ve sohbet geçmişi tamamen temizlendi.", "kaynaklar": []}]
         st.rerun()
 
@@ -192,6 +209,7 @@ for mesaj in st.session_state.mesajlar:
                 for k in mesaj["kaynaklar"]: st.markdown(f"**{k['dosya']}** (%{k['skor']*100:.1f})\n*{k['metin']}*")
 
 if soru := st.chat_input("Asistana sor..."):
+    logging.info(f"Kullanici sorusu: {soru}")
     st.session_state.mesajlar.append({"role": "user", "content": soru, "kaynaklar": []})
     with st.chat_message("user"): st.markdown(soru)
 
@@ -213,10 +231,9 @@ if soru := st.chat_input("Asistana sor..."):
                 "4) Cevabını her zaman sade ve profesyonel bir formatta ver."
             )
             
-            # YENİ EKLENEN: GÜVENLİ HAFIZA YÖNETİMİ (Sadece son 4 diyaloğu alır)
             messages = [{"role": "system", "content": sistem_promptu}]
-            gecmis = st.session_state.mesajlar[:-1] # Son soruyu hariç tut
-            for m in gecmis[-4:]: # Sadece son 4 mesajı al (Çökmeyi engeller)
+            gecmis = st.session_state.mesajlar[:-1] 
+            for m in gecmis[-4:]: 
                 messages.append({"role": m["role"], "content": m["content"]})
                 
             messages.append({"role": "user", "content": f"BAĞLAM:\n{baglam}\n\nSORU: {soru}"})
