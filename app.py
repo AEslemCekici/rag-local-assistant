@@ -118,10 +118,12 @@ with st.sidebar:
         
     with st.container(border=True):
         st.markdown("**🧠 Model Parametreleri**")
-        sicaklik = st.slider("Yaratıcılık (Temperature)", 0.0, 1.0, 0.1, 0.1)
+        sicaklik = st.slider("Yaratıcılık (Temperature)", 0.0, 1.0, 0.3, 0.1)
         max_uzunluk = st.slider("Maksimum Yanıt Uzunluğu", 200, 1500, 800, 100)
         chat_client.settings.temperature = sicaklik
         chat_client.settings.max_tokens = max_uzunluk
+        chat_client.settings.frequency_penalty = 1.2
+        chat_client.settings.presence_penalty = 1.0
 
     with st.container(border=True):
         st.markdown("**📂 Bilgi Bankası Yönetimi**")
@@ -216,7 +218,8 @@ if soru := st.chat_input("Asistana sor..."):
     with st.chat_message("assistant"):
         bulunanlar = en_benzer_parcalari_bul(soru, top_k=3)
         
-        if not bulunanlar or bulunanlar[0]["skor"] < 0.35:
+        # BARAJ BURADA 0.45'E ÇIKARILDI: Alakasız sorular doğrudan reddedilecek.
+        if not bulunanlar or bulunanlar[0]["skor"] < 0.45:
             st.warning("Bu konuyla ilgili yüklenmiş belgelerde yeterli bilgi bulunamadı.")
             st.session_state.mesajlar.append({"role": "assistant", "content": "Bilgi bulunamadı.", "kaynaklar": []})
         else:
